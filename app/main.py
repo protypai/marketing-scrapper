@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.config import settings
 from app.seed import seed_database
@@ -32,6 +32,10 @@ def startup_event():
     print("[Startup] Auto-running database migrations and seed...")
     seed_database()
 
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "service": "LeadHub Marketing Scrapper"}
+
 @app.get("/", response_class=HTMLResponse)
 def get_dashboard(request: Request):
     return templates.TemplateResponse(request=request, name="index.html", context={"project_name": settings.PROJECT_NAME})
@@ -39,4 +43,3 @@ def get_dashboard(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 def get_login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html", context={"project_name": settings.PROJECT_NAME})
-

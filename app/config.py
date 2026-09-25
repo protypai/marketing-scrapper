@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data/leadhub.db")
+    # PostgreSQL Database Connection
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres_password_2026@postgres:5432/leadhub")
 
     # Apify Settings
     APIFY_API_TOKEN: str = os.getenv("APIFY_API_TOKEN", "")
