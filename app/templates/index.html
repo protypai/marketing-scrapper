@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <link rel="icon" href="/static/logos/protypai-square.png">
+    <title>ProtypAI LeadHub - Multi-Category Discovery & Human Review Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- React 18 & ReactDOM & Babel CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Shadcn Design Tokens */
+        .shadcn-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.875rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .shadcn-badge { border-radius: 0.5rem; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.625rem; }
+        .shadcn-input { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 500; }
+        .shadcn-input:focus { background: #ffffff; border-color: #6366f1; outline: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const API_TOKEN = localStorage.getItem("access_token");
+        if (!API_TOKEN) {
+            window.location.href = "/login";
+        }
+
+        async function apiFetch(url, options = {}) {
+            options.headers = options.headers || {};
+            options.headers["Authorization"] = `Bearer ${API_TOKEN}`;
+            
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                localStorage.removeItem("access_token");
+                window.location.href = "/login";
+                throw new Error("Unauthorized");
+            }
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || "API Request Failed");
+            }
+            return await res.json();
+        }
+
+        function App() {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [projects, setProjects] = useState([]);
+            const [cities, setCities] = useState([]);
+            const [currentProject, setCurrentProject] = useState(null);
+            const [selectedCityId, setSelectedCityId] = useState("");
+            
+            const [activeTab, setActiveTab] = useState("UNREVIEWED");
+            const [searchQuery, setSearchQuery] = useState("");
+            const [minFollowers, setMinFollowers] = useState("1000");
+            const [statusFilter, setStatusFilter] = useState("");
+            
+            const [leads, setLeads] = useState([]);
+            const [tabCounts, setTabCounts] = useState({ UNREVIEWED: 0, KEEP: 0, REVIEW_LATER: 0, REJECT: 0 });
+            const [loadingLeads, setLoadingLeads] = useState(false);
+            const [activeJob, setActiveJob] = useState(null);
+            const [exportOpen, setExportOpen] = useState(false);
+            
+            const [notesDrawerLead, setNotesDrawerLead] = useState(null);
+            const [leadNotes, setLeadNotes] = useState([]);
+            const [newNoteContent, setNewNoteContent] = useState("");
+            const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
+            const [discoveryQueries, setDiscoveryQueries] = useState(null);
+            const [adminModalOpen, setAdminModalOpen] = useState(false);
+            const [adminUsers, setAdminUsers] = useState([]);
+            const [adminForm, setAdminForm] = useState({ email: "", password: "", full_name: "" });
+
+            useEffect(() => {
+                async function init() {
+                    try {
+                        const userRes = await apiFetch("/api/auth/me");
+                        setCurrentUser(userRes);
+
+                        const projRes = await apiFetch("/api/projects");
+                        setProjects(projRes);
+                        if (projRes.length > 0) {
+                            setCurrentProject(projRes[0]);
+                        }
+
+                        const cityRes = await apiFetch("/api/projects/cities");
+                        setCities(cityRes);
+                        if (cityRes.length > 0) {
+                            setSelectedCityId(cityRes[0].id.toString());
+                        }
+                    } catch (e) {
+                        console.error("Init Error:", e);
+                    }
+                }
+                init();
+            }, []);
+
+            const loadLeads = async () => {
+                if (!currentProject || !selectedCityId) return;
+                setLoadingLeads(true);
+                try {
+                    let url = `/api/leads?project_id=${currentProject.id}&city_id=${selectedCityId}&min_followers=${minFollowers}&review_state=${activeTab}`;
+                    if (searchQuery.trim()) url += `&search=${encodeURIComponent(searchQuery.trim())}`;
+                    if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
+
+                    const data = await apiFetch(url);
+                    setLeads(data);
+                } catch (e) {
+                    console.error("Load Leads Error:", e);
+                } finally {
+                    setLoadingLeads(false);
+                }
+            };
+
+            const loadTabCounts = async () => {
+                if (!currentProject || !selectedCityId) return;
+                const states = ["UNREVIEWED", "KEEP", "REVIEW_LATER", "REJECT"];
+                const counts = { UNREVIEWED: 0, KEEP: 0, REVIEW_LATER: 0, REJECT: 0 };
+                for (const st of states) {
+                    try {
+                        const res = await apiFetch(`/api/leads?project_id=${currentProject.id}&city_id=${selectedCityId}&min_followers=${minFollowers}&review_state=${st}`);
+                        counts[st] = res.length;
+                    } catch (e) {}
+                }
+                setTabCounts(counts);
+            };
+
+            useEffect(() => {
+                loadLeads();
+                loadTabCounts();
+            }, [currentProject, selectedCityId, activeTab, minFollowers, statusFilter]);
+
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    loadLeads();
+                }, 300);
+                return () => clearTimeout(timer);
+            }, [searchQuery]);
+
+            useEffect(() => {
+                const interval = setInterval(async () => {
+                    try {
+                        const jobs = await apiFetch("/api/admin/jobs");
+                        const running = jobs.find(j => j.status === "running" || j.status === "pending");
+                        setActiveJob(running || null);
+                        if (!running && activeJob) {
+                            loadLeads();
+                            loadTabCounts();
+                        }
+                    } catch (e) {}
+                }, 4000);
+                return () => clearInterval(interval);
+            }, [activeJob]);
+
+            const triggerApifyCollection = async () => {
+                if (!currentProject || !selectedCityId) return;
+                try {
+                    const res = await apiFetch(`/api/leads/rescrape?project_id=${currentProject.id}&city_id=${selectedCityId}`, {
+                        method: "POST"
+                    });
+                    setActiveJob(res);
+                } catch (e) {
+                    alert("Failed to start Apify collection: " + e.message);
+                }
+            };
+
+            const handleSetReviewState = async (leadId, newState) => {
+                try {
+                    await apiFetch(`/api/leads/${leadId}/review`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ review_state: newState })
+                    });
+                    loadTabCounts();
+                    loadLeads();
+                } catch (e) {
+                    alert("Failed to update decision: " + e.message);
+                }
+            };
+
+            const openNotesDrawer = async (lead) => {
+                setNotesDrawerLead(lead);
+                try {
+                    const notes = await apiFetch(`/api/leads/${lead.id}/notes`);
+                    setLeadNotes(notes);
+                } catch (e) {
+                    setLeadNotes([]);
+                }
+            };
+
+            const submitNote = async () => {
+                if (!newNoteContent.trim() || !notesDrawerLead) return;
+                try {
+                    await apiFetch(`/api/leads/${notesDrawerLead.id}/notes`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ note_content: newNoteContent.trim() })
+                    });
+                    setNewNoteContent("");
+                    const notes = await apiFetch(`/api/leads/${notesDrawerLead.id}/notes`);
+                    setLeadNotes(notes);
+                    loadLeads();
+                } catch (e) {
+                    alert("Failed to save note: " + e.message);
+                }
+            };
+
+            const openDiscoveryModal = async () => {
+                if (!currentProject || !selectedCityId) return;
+                try {
+                    const data = await apiFetch(`/api/leads/discovery-queries?project_id=${currentProject.id}&city_id=${selectedCityId}`);
+                    setDiscoveryQueries(data);
+                    setDiscoveryModalOpen(true);
+                } catch (e) {
+                    alert("Failed to load discovery categories: " + e.message);
+                }
+            };
+
+            const openAdminModal = async () => {
+                setAdminModalOpen(true);
+                try {
+                    const users = await apiFetch("/api/admin/users");
+                    setAdminUsers(users);
+                } catch (e) {}
+            };
+
+            const createTeamUser = async () => {
+                if (!adminForm.email || !adminForm.password || !adminForm.full_name) return;
+                try {
+                    await apiFetch("/api/admin/users", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...adminForm, role: "member" })
+                    });
+                    setAdminForm({ email: "", password: "", full_name: "" });
+                    const users = await apiFetch("/api/admin/users");
+                    setAdminUsers(users);
+                } catch (e) {
+                    alert("Failed to create user: " + e.message);
+                }
+            };
+
+            const handleExport = (format) => {
+                if (!currentProject) return;
+                let url = `/api/leads/export?project_id=${currentProject.id}&format=${format}&review_state=${activeTab}`;
+                if (selectedCityId) url += `&city_id=${selectedCityId}`;
+                window.open(url, "_blank");
+                setExportOpen(false);
+            };
+
+            const logout = () => {
+                localStorage.removeItem("access_token");
+                window.location.href = "/login";
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Shadcn Header with Official ProtypAI Brand Logos */}
+                    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 p-1 flex items-center justify-center shadow-xs">
+                                <img src="/static/logos/protypai-square.png" alt="ProtypAI" className="w-8 h-8 object-contain rounded-lg" onError={(e) => { e.target.onerror=null; e.target.src='/static/logos/protypai-logo.svg'; }} />
+                            </div>
+                            <div>
+                                <h1 className="font-bold text-lg text-slate-900 tracking-wide flex items-center space-x-2">
+                                    <span className="text-indigo-600 font-extrabold">ProtypAI</span>
+                                    <span>LeadHub</span>
+                                    <span className="text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold uppercase">Discovery Engine</span>
+                                </h1>
+                                <p className="text-xs text-slate-500">Apify Multi-Source Collection & Human Review Queue</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-4">
+                            <button onClick={openDiscoveryModal} className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center space-x-2 transition shadow-2xs">
+                                <i className="fa-solid fa-layer-group"></i>
+                                <span>Discovery Categories</span>
+                            </button>
+
+                            {currentUser?.role === "admin" && (
+                                <button onClick={openAdminModal} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 flex items-center space-x-2 transition">
+                                    <i className="fa-solid fa-user-shield"></i>
+                                    <span>Admin Panel</span>
+                                </button>
+                            )}
+
+                            <div className="flex items-center space-x-3 bg-slate-100/80 px-3 py-1.5 rounded-xl border border-slate-200">
+                                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                                    {currentUser?.full_name ? currentUser.full_name.charAt(0).toUpperCase() : "U"}
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-xs font-bold text-slate-900 leading-none">{currentUser?.full_name || "Loading..."}</div>
+                                    <div className="text-[10px] font-semibold text-slate-500 uppercase leading-none mt-1">{currentUser?.role || "team member"}</div>
+                                </div>
+                                <button onClick={logout} title="Logout" className="text-slate-400 hover:text-red-600 ml-2 transition">
+                                    <i className="fa-solid fa-right-from-bracket text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Workspace Layout */}
+                    <div className="flex-1 flex overflow-hidden">
+                        {/* Shadcn Sidebar */}
+                        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 p-4 shadow-2xs">
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3 px-2">Target Product</div>
+                                    <div className="space-y-2">
+                                        {projects.map(p => {
+                                            const isPump = p.slug === "pumppilot";
+                                            return (
+                                                <button 
+                                                    key={p.id} 
+                                                    onClick={() => setCurrentProject(p)} 
+                                                    className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-bold flex items-center justify-between transition border ${currentProject?.id === p.id ? (isPump ? 'bg-amber-600 border-amber-600 text-white shadow-md shadow-amber-600/20' : 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/20') : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                                >
+                                                    <div className="flex items-center space-x-2.5 truncate">
+                                                        {isPump ? (
+                                                            <div className="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                                                                <i className="fa-solid fa-gas-pump text-xs"></i>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+                                                                <img src="/static/logos/pharmaflow-logo.svg" alt="PharmaFlow" className="w-4 h-4 object-contain" onError={(e) => { e.target.style.display='none'; }} />
+                                                            </div>
+                                                        )}
+                                                        <span className="truncate">{p.name}</span>
+                                                    </div>
+                                                    <i className="fa-solid fa-chevron-right text-[10px] opacity-70 ml-1"></i>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                                    <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                                        <span>Discovery Philosophy</span>
+                                        <i className="fa-solid fa-lightbulb text-indigo-600"></i>
+                                    </div>
+                                    <p className="text-xs text-slate-600 leading-relaxed">{currentProject?.description || "Apify finds broadly across local business, industry & community pages. Your team reviews & classifies the best leads."}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100 space-y-2.5">
+                                <div className="text-xs font-bold uppercase tracking-wider text-indigo-900">Queue Sorting</div>
+                                <div className="flex items-center justify-between text-xs text-slate-700">
+                                    <span>Ranked By:</span>
+                                    <span className="font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-xs">Discovery Score</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs text-slate-700">
+                                    <span>Target Region:</span>
+                                    <span className="font-semibold text-emerald-700">AP & TS Cities</span>
+                                </div>
+                            </div>
+                        </aside>
+
+                        {/* Main Content Workspace */}
+                        <main className="flex-1 flex flex-col min-w-0 bg-slate-50 overflow-y-auto custom-scrollbar">
+                            {activeJob && (
+                                <div className="bg-indigo-600 text-white px-6 py-2.5 text-xs flex items-center justify-between shadow-md">
+                                    <div className="flex items-center space-x-2">
+                                        <i className="fa-solid fa-circle-notch fa-spin text-sm"></i>
+                                        <span className="font-medium">Apify collection running in background...</span>
+                                    </div>
+                                    <span className="text-[10px] bg-indigo-500/50 px-2 py-0.5 rounded font-mono">Live Sync</span>
+                                </div>
+                            )}
+
+                            {/* Toolbar & Filters */}
+                            <div className="p-6 pb-4 space-y-4 border-b border-slate-200 bg-white shadow-2xs">
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    {/* Tabs */}
+                                    <div className="flex items-center space-x-2 bg-slate-100/90 p-1.5 rounded-xl border border-slate-200">
+                                        <button 
+                                            onClick={() => setActiveTab("UNREVIEWED")} 
+                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${activeTab === 'UNREVIEWED' ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/60' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            <i className="fa-solid fa-list-check"></i>
+                                            <span>Human Review Queue</span>
+                                            <span className="bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded-full text-[10px]">{tabCounts.UNREVIEWED}</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveTab("KEEP")} 
+                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${activeTab === 'KEEP' ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/60' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            <i className="fa-solid fa-circle-check text-emerald-600"></i>
+                                            <span>Qualified Lead Pool</span>
+                                            <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full text-[10px]">{tabCounts.KEEP}</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveTab("REVIEW_LATER")} 
+                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${activeTab === 'REVIEW_LATER' ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/60' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            <i className="fa-solid fa-clock"></i>
+                                            <span>Review Later</span>
+                                            <span className="bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded-full text-[10px]">{tabCounts.REVIEW_LATER}</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setActiveTab("REJECT")} 
+                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${activeTab === 'REJECT' ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/60' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            <i className="fa-solid fa-box-archive"></i>
+                                            <span>Rejected</span>
+                                            <span className="bg-red-100 text-red-800 px-1.5 py-0.2 rounded-full text-[10px]">{tabCounts.REJECT}</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center space-x-3">
+                                        <button 
+                                            onClick={triggerApifyCollection} 
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-md shadow-indigo-600/20 text-xs flex items-center space-x-2 transition"
+                                        >
+                                            <i className="fa-solid fa-arrows-rotate"></i>
+                                            <span>Run Apify Collection</span>
+                                        </button>
+
+                                        <div className="relative inline-block text-left">
+                                            <button onClick={() => setExportOpen(!exportOpen)} className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold rounded-xl text-xs flex items-center space-x-2 transition shadow-xs">
+                                                <i className="fa-solid fa-download"></i>
+                                                <span>Export Leads</span>
+                                                <i className="fa-solid fa-chevron-down text-[10px]"></i>
+                                            </button>
+                                            {exportOpen && (
+                                                <div className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1">
+                                                    <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center space-x-2">
+                                                        <i className="fa-solid fa-file-csv text-emerald-600"></i>
+                                                        <span>Export CSV</span>
+                                                    </button>
+                                                    <button onClick={() => handleExport('xlsx')} className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center space-x-2">
+                                                        <i className="fa-solid fa-file-excel text-emerald-700"></i>
+                                                        <span>Export Excel</span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Select Target City</label>
+                                        <select 
+                                            value={selectedCityId} 
+                                            onChange={(e) => setSelectedCityId(e.target.value)} 
+                                            className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-600 focus:bg-white font-semibold"
+                                        >
+                                            {cities.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Search Account / Bio</label>
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                value={searchQuery} 
+                                                onChange={(e) => setSearchQuery(e.target.value)} 
+                                                placeholder="Search name, @username..." 
+                                                className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:border-indigo-600 focus:bg-white font-medium" 
+                                            />
+                                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs"><i className="fa-solid fa-magnifying-glass"></i></span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Min Followers</label>
+                                        <select 
+                                            value={minFollowers} 
+                                            onChange={(e) => setMinFollowers(e.target.value)} 
+                                            className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-600 focus:bg-white font-semibold"
+                                        >
+                                            <option value="0">All Followers</option>
+                                            <option value="1000">≥ 1,000 Followers</option>
+                                            <option value="5000">≥ 5,000 Followers</option>
+                                            <option value="10000">≥ 10,000 Followers</option>
+                                            <option value="25000">≥ 25,000 Followers</option>
+                                            <option value="50000">≥ 50,000 Followers</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Outreach Status</label>
+                                        <select 
+                                            value={statusFilter} 
+                                            onChange={(e) => setStatusFilter(e.target.value)} 
+                                            className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-600 focus:bg-white font-semibold"
+                                        >
+                                            <option value="">All Outreach Statuses</option>
+                                            <option value="New">New</option>
+                                            <option value="Contacted">Contacted</option>
+                                            <option value="In Talks">In Talks</option>
+                                            <option value="Onboarded">Onboarded</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 5-Column Shadcn Table Area */}
+                            <div className="p-6 flex-1">
+                                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                                    <div className="overflow-x-auto custom-scrollbar">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-100/80 text-[11px] uppercase font-bold tracking-wider text-slate-600 border-b border-slate-200">
+                                                    <th className="py-3.5 px-4 w-5/12">Discovery Score & Profile</th>
+                                                    <th className="py-3.5 px-4 w-2/12">Signals & City</th>
+                                                    <th className="py-3.5 px-4 w-2/12">Contact Details</th>
+                                                    <th className="py-3.5 px-4 text-center w-2/12">Human Decision</th>
+                                                    <th className="py-3.5 px-4 text-center w-1/12">Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 text-xs">
+                                                {loadingLeads ? (
+                                                    <tr>
+                                                        <td colSpan={5} className="py-12 text-center text-slate-400">
+                                                            <i className="fa-solid fa-circle-notch fa-spin text-2xl mb-2 text-indigo-600"></i>
+                                                            <p>Loading discovery queue...</p>
+                                                        </td>
+                                                    </tr>
+                                                ) : leads.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={5} className="py-12 text-center text-slate-400">
+                                                            <i className="fa-solid fa-folder-open text-3xl mb-2 text-slate-300"></i>
+                                                            <p className="font-medium text-slate-600 mt-1">No accounts found in this review state for selected city.</p>
+                                                            <p className="text-xs text-slate-400 mt-0.5">Click 'Run Apify Collection' above to discover live Instagram leads!</p>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    leads.map(l => (
+                                                        <tr key={l.id} className="hover:bg-indigo-50/30 transition border-b border-slate-100">
+                                                            <td className="py-4 px-4 align-top">
+                                                                <div className="flex items-start space-x-3">
+                                                                    <div className="shrink-0 flex flex-col items-center space-y-1.5">
+                                                                        <div className="bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-2 py-0.5 rounded-md text-[11px] shadow-xs">
+                                                                            {l.discovery_score} Score
+                                                                        </div>
+                                                                        <img 
+                                                                            src={l.profile_pic_url ? `/api/leads/proxy-image?url=${encodeURIComponent(l.profile_pic_url)}` : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(l.full_name || l.username) + '&background=6366f1&color=fff&bold=true'} 
+                                                                            referrerPolicy="no-referrer"
+                                                                            onError={(e) => { 
+                                                                                e.target.onerror = null; 
+                                                                                e.target.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(l.full_name || l.username) + '&background=6366f1&color=fff&bold=true'; 
+                                                                            }} 
+                                                                            className="w-11 h-11 rounded-full border border-slate-200 object-cover shadow-xs" 
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="font-bold text-slate-900 text-sm leading-snug">{l.full_name || l.username}</div>
+                                                                        <div className="flex items-center space-x-2 mt-0.5">
+                                                                            <a href={`https://instagram.com/${l.username}`} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800 font-mono font-bold text-xs flex items-center space-x-1">
+                                                                                <i className="fa-brands fa-instagram text-indigo-500"></i>
+                                                                                <span>@{l.username}</span>
+                                                                                <i className="fa-solid fa-arrow-up-right-from-square text-[9px] ml-0.5"></i>
+                                                                            </a>
+                                                                            <span className="text-slate-300">•</span>
+                                                                            <span className="text-slate-500 text-xs"><i className="fa-solid fa-users mr-1 text-slate-400"></i><b>{l.follower_count.toLocaleString()}</b> followers</span>
+                                                                        </div>
+                                                                        {l.bio_text ? (
+                                                                            <p className="text-xs text-slate-700 mt-2 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/60 leading-relaxed font-normal">{l.bio_text}</p>
+                                                                        ) : (
+                                                                            <p className="text-xs text-slate-400 italic mt-1">No bio provided</p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+
+                                                            <td className="py-4 px-4 align-top">
+                                                                <div className="space-y-2">
+                                                                    <div><span className="bg-indigo-600 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-xs">{l.city_name}</span></div>
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {(l.discovery_signals || []).map((s, idx) => (
+                                                                            <span key={idx} className="bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                                                                <i className="fa-solid fa-check text-emerald-600 text-[9px] mr-1"></i>{s}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+
+                                                            <td className="py-4 px-4 align-top">
+                                                                <div className="space-y-2">
+                                                                    {l.public_phone && (
+                                                                        <div className="flex items-center space-x-2">
+                                                                            <span className="text-emerald-800 font-semibold text-xs"><i className="fa-solid fa-phone mr-1.5 text-emerald-600"></i>{l.public_phone}</span>
+                                                                            {l.whatsapp_link && (
+                                                                                <a href={l.whatsapp_link} target="_blank" rel="noreferrer" className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded-lg text-xs font-bold transition flex items-center space-x-1">
+                                                                                    <i className="fa-brands fa-whatsapp text-emerald-600"></i>
+                                                                                    <span>WhatsApp</span>
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                    {l.public_email && (
+                                                                        <div>
+                                                                            <a href={`mailto:${l.public_email}`} className="text-indigo-600 hover:underline font-medium text-xs break-all">
+                                                                                <i className="fa-solid fa-envelope mr-1 text-indigo-500"></i>{l.public_email}
+                                                                            </a>
+                                                                        </div>
+                                                                    )}
+                                                                    {!l.public_phone && !l.public_email && (
+                                                                        <div className="text-slate-500 text-xs italic bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-block">
+                                                                            <i className="fa-brands fa-instagram mr-1 text-slate-400"></i>Check Instagram Bio / DM
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+
+                                                            <td className="py-4 px-4 text-center align-top">
+                                                                <div className="flex items-center justify-center space-x-1.5">
+                                                                    <button 
+                                                                        onClick={() => handleSetReviewState(l.id, 'KEEP')} 
+                                                                        title="Keep Lead" 
+                                                                        className={`px-3 py-1.5 ${l.review_state === 'KEEP' ? 'bg-emerald-600 text-white font-bold shadow-sm' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-semibold transition flex items-center space-x-1`}
+                                                                    >
+                                                                        <i className="fa-solid fa-check"></i>
+                                                                        <span>KEEP</span>
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleSetReviewState(l.id, 'REVIEW_LATER')} 
+                                                                        title="Review Later" 
+                                                                        className={`px-2.5 py-1.5 ${l.review_state === 'REVIEW_LATER' ? 'bg-amber-500 text-white font-bold shadow-sm' : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'} rounded-xl text-xs font-semibold transition`}
+                                                                    >
+                                                                        <i className="fa-solid fa-clock"></i>
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleSetReviewState(l.id, 'REJECT')} 
+                                                                        title="Reject Lead" 
+                                                                        className={`px-2.5 py-1.5 ${l.review_state === 'REJECT' ? 'bg-red-600 text-white font-bold shadow-sm' : 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'} rounded-xl text-xs font-semibold transition`}
+                                                                    >
+                                                                        <i className="fa-solid fa-xmark"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+
+                                                            <td className="py-4 px-4 text-center align-top">
+                                                                <button 
+                                                                    onClick={() => openNotesDrawer(l)} 
+                                                                    className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold space-x-1.5 shadow-xs transition"
+                                                                >
+                                                                    <i className="fa-solid fa-comment-dots text-indigo-600"></i>
+                                                                    <span>Notes ({l.notes_count})</span>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+
+                    {/* Notes Side Drawer */}
+                    {notesDrawerLead && (
+                        <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-slate-200 shadow-2xl z-40 flex flex-col">
+                            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                                <div>
+                                    <h3 className="font-bold text-sm text-slate-900">Notes: @{notesDrawerLead.username}</h3>
+                                    <p className="text-[11px] text-slate-500">Team comments & outreach logs</p>
+                                </div>
+                                <button onClick={() => setNotesDrawerLead(null)} className="text-slate-400 hover:text-slate-700 p-1">
+                                    <i className="fa-solid fa-xmark text-lg"></i>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar bg-slate-50/50">
+                                {leadNotes.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 text-xs italic">No notes added yet for this account.</div>
+                                ) : (
+                                    leadNotes.map(n => (
+                                        <div key={n.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-1">
+                                            <div className="flex items-center justify-between text-[11px]">
+                                                <span className="font-bold text-slate-800">{n.author_name}</span>
+                                                <span className="text-slate-400">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-700 leading-relaxed">{n.note_content}</p>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <div className="p-4 border-t border-slate-200 bg-white space-y-2">
+                                <textarea 
+                                    rows="3" 
+                                    value={newNoteContent} 
+                                    onChange={(e) => setNewNoteContent(e.target.value)} 
+                                    placeholder="Add note (e.g. Spoke to owner on WhatsApp, scheduled demo)..." 
+                                    className="w-full bg-slate-50 border border-slate-300 text-xs rounded-xl p-2.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                                ></textarea>
+                                <button onClick={submitNote} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-md transition flex items-center justify-center space-x-2">
+                                    <i className="fa-solid fa-paper-plane"></i>
+                                    <span>Add Note</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Discovery Categories Modal */}
+                    {discoveryModalOpen && discoveryQueries && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                            <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full p-6 space-y-6 shadow-2xl overflow-hidden">
+                                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                                            <i className="fa-solid fa-layer-group text-indigo-600"></i>
+                                            <span>Multi-Category Discovery Engine Setup</span>
+                                        </h3>
+                                        <p className="text-xs text-slate-500">4 Query Tracks generated for Apify Collection</p>
+                                    </div>
+                                    <button onClick={() => setDiscoveryModalOpen(false)} className="text-slate-400 hover:text-slate-700">
+                                        <i className="fa-solid fa-xmark text-lg"></i>
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar p-1">
+                                    {Object.entries(discoveryQueries).map(([cat, queries]) => (
+                                        <div key={cat} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                            <div className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center justify-between">
+                                                <span>{cat} Track</span>
+                                                <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px]">{queries.length} Queries</span>
+                                            </div>
+                                            <ul className="space-y-1">
+                                                {queries.map((q, idx) => (
+                                                    <li key={idx} className="text-xs text-slate-700 flex items-center space-x-1.5">
+                                                        <i className="fa-solid fa-hashtag text-indigo-500 text-[10px]"></i>
+                                                        <span>{q}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Admin Modal */}
+                    {adminModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                            <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl overflow-hidden">
+                                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                    <h3 className="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                                        <i className="fa-solid fa-user-shield text-indigo-600"></i>
+                                        <span>Admin Portal - Team Management</span>
+                                    </h3>
+                                    <button onClick={() => setAdminModalOpen(false)} className="text-slate-400 hover:text-slate-700">
+                                        <i className="fa-solid fa-xmark text-lg"></i>
+                                    </button>
+                                </div>
+
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Add New Team Member</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <input 
+                                            type="text" 
+                                            value={adminForm.full_name} 
+                                            onChange={(e) => setAdminForm({ ...adminForm, full_name: e.target.value })} 
+                                            placeholder="Full Name" 
+                                            className="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 text-slate-800" 
+                                        />
+                                        <input 
+                                            type="email" 
+                                            value={adminForm.email} 
+                                            onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} 
+                                            placeholder="Email Address" 
+                                            className="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 text-slate-800" 
+                                        />
+                                        <input 
+                                            type="password" 
+                                            value={adminForm.password} 
+                                            onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} 
+                                            placeholder="Password" 
+                                            className="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 text-slate-800" 
+                                        />
+                                    </div>
+                                    <button onClick={createTeamUser} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-xs">
+                                        Create Team User
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Existing Team Users</h4>
+                                    <div className="max-h-48 overflow-y-auto space-y-2 custom-scrollbar pr-1">
+                                        {adminUsers.map(u => (
+                                            <div key={u.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                                                <div>
+                                                    <span className="font-bold text-slate-900">{u.full_name}</span>
+                                                    <span className="text-slate-500 ml-2">({u.email})</span>
+                                                </div>
+                                                <span className="bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded uppercase text-[10px]">{u.role}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+    </script>
+</body>
+</html>

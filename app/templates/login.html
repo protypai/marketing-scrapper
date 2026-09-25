@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <link rel="icon" href="/static/logos/protypai-square.png">
+    <title>ProtypAI LeadHub - Secure Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .shadcn-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 1rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05); }
+        .shadcn-input { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 0.75rem; transition: all 0.15s ease-in-out; }
+        .shadcn-input:focus { background: #ffffff; border-color: #6366f1; ring: 2px; ring-color: rgba(99, 102, 241, 0.2); }
+        .shadcn-button { border-radius: 0.75rem; font-weight: 600; transition: all 0.15s ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex items-center justify-center p-4 font-sans">
+    <div class="max-w-md w-full bg-white border border-slate-200/80 rounded-3xl shadow-xl overflow-hidden p-8 space-y-6">
+        <!-- ProtypAI Official Suite Brand Logo Header -->
+        <div class="text-center space-y-3">
+            <div class="inline-flex items-center justify-center p-2 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-sm mb-1">
+                <img src="/static/logos/protypai-square.png" alt="ProtypAI Logo" class="w-14 h-14 object-contain rounded-xl" onError="this.src='/static/logos/protypai-logo.svg'">
+            </div>
+            <div>
+                <div class="flex items-center justify-center space-x-1.5 mb-1">
+                    <span class="text-xs font-extrabold uppercase tracking-widest text-indigo-600 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">ProtypAI Suite</span>
+                </div>
+                <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">LeadHub Discovery</h1>
+                <p class="text-xs text-slate-500 mt-1">Multi-Category Audience Scraper & Lead Engine</p>
+            </div>
+
+            <!-- Official Product Logos: PumpPilot & PharmaFlow -->
+            <div class="flex items-center justify-center space-x-3 pt-2">
+                <div class="bg-amber-50/80 border border-amber-200 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-900 flex items-center space-x-2 shadow-2xs">
+                    <i class="fa-solid fa-gas-pump text-amber-600"></i>
+                    <span>PumpPilot (Fuel)</span>
+                </div>
+                <div class="bg-emerald-50/80 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-900 flex items-center space-x-2 shadow-2xs">
+                    <img src="/static/logos/pharmaflow-logo.svg" alt="PharmaFlow" class="w-4 h-4 object-contain" onError="this.style.display='none'">
+                    <span>PharmaFlow (ERP)</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="error-alert" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs text-center font-semibold"></div>
+
+        <!-- Secure Login Form -->
+        <form id="login-form" class="space-y-4 pt-1">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Email Address</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm"><i class="fa-solid fa-envelope"></i></span>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        required 
+                        autocomplete="email" 
+                        placeholder="yourname@protypai.com" 
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white text-xs font-medium"
+                    />
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Password</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm"><i class="fa-solid fa-lock"></i></span>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        required 
+                        autocomplete="current-password" 
+                        placeholder="••••••••••••" 
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white text-xs font-medium"
+                    />
+                </div>
+            </div>
+
+            <button 
+                type="submit" 
+                id="submit-btn" 
+                class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-600/20 transition duration-150 text-xs flex items-center justify-center space-x-2"
+            >
+                <span>Sign In to ProtypAI Dashboard</span>
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </form>
+
+        <div class="pt-4 border-t border-slate-200 text-center text-[11px] text-slate-400 font-medium">
+            Protected by ProtypAI Authentication & Encrypted Storage
+        </div>
+    </div>
+
+    <script>
+        if (localStorage.getItem("access_token")) {
+            window.location.href = "/";
+        }
+
+        document.getElementById("login-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            const errAlert = document.getElementById("error-alert");
+            const submitBtn = document.getElementById("submit-btn");
+
+            errAlert.classList.add("hidden");
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Authenticating...</span>`;
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append("username", email);
+                formData.append("password", password);
+
+                const res = await fetch("/api/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.detail || "Invalid login credentials");
+                }
+
+                const data = await res.json();
+                localStorage.setItem("access_token", data.access_token);
+                window.location.href = "/";
+            } catch (err) {
+                errAlert.innerText = err.message;
+                errAlert.classList.remove("hidden");
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<span>Sign In to ProtypAI Dashboard</span> <i class="fa-solid fa-arrow-right"></i>`;
+            }
+        });
+    </script>
+</body>
+</html>

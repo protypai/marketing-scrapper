@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: leadhub_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-leadhub}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-leadhub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: leadhub_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-super-secret-key-change-in-production-2026}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password_2026}@db:5432/${POSTGRES_DB:-leadhub}
+      - APIFY_API_TOKEN=${APIFY_API_TOKEN:-apify_api_GYzwyehhEZnNVzq2TQwB6BT6gHImIf3B9WPf}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@protypai.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin@PumpPharma2026}
+      - ADMIN_NAME=${ADMIN_NAME:-Admin User}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
