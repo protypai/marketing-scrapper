@@ -16,7 +16,6 @@ volumes:
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: scrapper_postgres
     restart: unless-stopped
     networks: [scrapper-network]
     expose:
@@ -29,7 +28,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-leadhub} || exit 1"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -37,13 +36,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: scrapper_app
     restart: unless-stopped
     networks: [scrapper-network]
     expose:
       - "8000"
     environment:
       - SECRET_KEY=${SECRET_KEY:-super-secret-key-change-in-production-2026}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_password_2026}
+      - POSTGRES_DB=${POSTGRES_DB:-leadhub}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password_2026}@postgres:5432/${POSTGRES_DB:-leadhub}
       - APIFY_API_TOKEN=${APIFY_API_TOKEN:-apify_api_GYzwyehhEZnNVzq2TQwB6BT6gHImIf3B9WPf}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@protypai.com}
