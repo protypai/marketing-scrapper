@@ -19,8 +19,6 @@ services:
     container_name: scrapper_postgres
     restart: unless-stopped
     networks: [scrapper-network]
-    ports:
-      - "5433:5432"
     expose:
       - "5432"
     environment:
@@ -42,8 +40,6 @@ services:
     container_name: scrapper_app
     restart: unless-stopped
     networks: [scrapper-network]
-    ports:
-      - "8000:8000"
     expose:
       - "8000"
     environment:
