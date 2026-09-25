@@ -1,14 +1,8 @@
 version: "3.9"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LeadHub Marketing Scrapper — Application Stack (PumpPilot Standard)
-# Configured for Production & Coolify Deployment
+# LeadHub Marketing Scrapper — Application Stack (Coolify Deployment Ready)
 # ─────────────────────────────────────────────────────────────────────────────
-
-networks:
-  scrapper-network:
-    name: scrapper_shared_network
-    driver: bridge
 
 volumes:
   postgres_data:
@@ -17,7 +11,6 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: unless-stopped
-    networks: [scrapper-network]
     expose:
       - "5432"
     environment:
@@ -37,7 +30,6 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    networks: [scrapper-network]
     expose:
       - "8000"
     environment:
