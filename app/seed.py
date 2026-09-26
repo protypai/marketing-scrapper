@@ -129,13 +129,132 @@ def seed_database():
                     db.add(pch)
 
         db.commit()
-        print("[Seed] Configuration seeding completed. (0 hardcoded leads added)")
+        print("[Seed] Configuration seeding completed.")
+        seed_demo_target_leads(db)
 
     except Exception as e:
         db.rollback()
         print(f"[Seed] Error seeding database: {e}")
     finally:
         db.close()
+
+def seed_demo_target_leads(db: Session):
+    """Seed initial target leads for PumpPilot and PharmaFlow if table is empty"""
+    existing_count = db.query(models.InfluencerLead).count()
+    if existing_count > 0:
+        return
+
+    print("[Seed] Seeding target lead queue for PumpPilot & PharmaFlow...")
+    pumppilot = db.query(models.Project).filter(models.Project.slug == "pumppilot").first()
+    pharmaflow = db.query(models.Project).filter(models.Project.slug == "pharmaflow").first()
+
+    cities = {c.name: c.id for c in db.query(models.City).all()}
+
+    demo_leads = [
+        # PumpPilot Leads
+        {
+            "project_id": pumppilot.id if pumppilot else 1,
+            "city_id": cities.get("Rajahmundry", 1),
+            "username": "rajahmundry_petrol_pumps",
+            "full_name": "Rajahmundry Bunk Owners & Fuel Dealers",
+            "follower_count": 28400,
+            "following_count": 1240,
+            "media_count": 3280,
+            "profile_pic_url": "https://images.unsplash.com/photo-1527018601619-a508a2be00cd?w=200",
+            "bio_text": "HPCL, BPCL & IOCL Dealers Association Rajahmundry • Shift Automation • Tank Dips & Credit Sales • Fleet Fuel Managers",
+            "public_email": "contact@rajahmundryfuel.org",
+            "public_phone": "+91 98480 12345",
+            "whatsapp_link": "https://wa.me/919848012345",
+            "external_url": "https://rajahmundryfuel.org",
+            "discovery_score": 96,
+            "discovery_signals": ["#rajahmundry", "City Match", "Fuel Station", "HPCL Dealer", "Shift Dip", "Multi-Source Match"],
+            "review_state": "UNREVIEWED",
+            "status": "New"
+        },
+        {
+            "project_id": pumppilot.id if pumppilot else 1,
+            "city_id": cities.get("Hyderabad", 2),
+            "username": "hyderabad_fuel_dealers",
+            "full_name": "Cyberabad Petroleum & Fleet Hub",
+            "follower_count": 45200,
+            "following_count": 890,
+            "media_count": 1540,
+            "profile_pic_url": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=200",
+            "bio_text": "Hyderabad Petrol Pump Association • Digital Nozzle Meters • Credit Sales Automation • Tanker Dip Logs • Contact for Software",
+            "public_email": "info@cyberabadfuel.com",
+            "public_phone": "+91 99890 54321",
+            "whatsapp_link": "https://wa.me/919989054321",
+            "external_url": "https://cyberabadfuel.com",
+            "discovery_score": 94,
+            "discovery_signals": ["#hyderabad", "City Match", "Petrol Bunk", "Fleet Manager", "Credit Ledger"],
+            "review_state": "UNREVIEWED",
+            "status": "New"
+        },
+        {
+            "project_id": pumppilot.id if pumppilot else 1,
+            "city_id": cities.get("Visakhapatnam", 3),
+            "username": "vizag_petroleum_hub",
+            "full_name": "Vizag Port Fuel & Transport Bunks",
+            "follower_count": 18900,
+            "following_count": 620,
+            "media_count": 890,
+            "profile_pic_url": "https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=200",
+            "bio_text": "Vizag Coast Fuel Stations • Heavy Commercial Vehicle Refueling • Shift Reconciliation & Dip Software • DM for demos",
+            "public_email": "ops@vizagbunks.in",
+            "public_phone": "+91 98491 67890",
+            "whatsapp_link": "https://wa.me/919849167890",
+            "external_url": "https://vizagbunks.in",
+            "discovery_score": 91,
+            "discovery_signals": ["#vizag", "City Match", "Port Fuel", "Transport Fleet"],
+            "review_state": "UNREVIEWED",
+            "status": "New"
+        },
+        # PharmaFlow Leads
+        {
+            "project_id": pharmaflow.id if pharmaflow else 2,
+            "city_id": cities.get("Rajahmundry", 1),
+            "username": "rajahmundry_chemists",
+            "full_name": "Rajahmundry Wholesale Chemists & Druggists",
+            "follower_count": 34100,
+            "following_count": 1420,
+            "media_count": 2100,
+            "profile_pic_url": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=200",
+            "bio_text": "Retail Pharmacy Stores & Distributors Association • GST Billing • Batch Expiry Tracking • Medicine Stock Automation • DM for Collabs",
+            "public_email": "pharma@rajahmundrychemists.in",
+            "public_phone": "+91 94401 23456",
+            "whatsapp_link": "https://wa.me/919440123456",
+            "external_url": "https://rajahmundrychemists.in",
+            "discovery_score": 97,
+            "discovery_signals": ["#rajahmundry", "City Match", "Pharmacy ERP", "GST Billing", "Batch Expiry", "Multi-Source Match"],
+            "review_state": "UNREVIEWED",
+            "status": "New"
+        },
+        {
+            "project_id": pharmaflow.id if pharmaflow else 2,
+            "city_id": cities.get("Hyderabad", 2),
+            "username": "hyderabad_medical_distributors",
+            "full_name": "Hyderabad Retail Pharmacy Network",
+            "follower_count": 52800,
+            "following_count": 2100,
+            "media_count": 4120,
+            "profile_pic_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200",
+            "bio_text": "Medical Stores & Wholesale Pharma Distributors • Stock Ledger • Schedule H1 Drug Logs • Quick Billing Systems",
+            "public_email": "support@hyderabadpharma.org",
+            "public_phone": "+91 98488 77665",
+            "whatsapp_link": "https://wa.me/919848877665",
+            "external_url": "https://hyderabadpharma.org",
+            "discovery_score": 95,
+            "discovery_signals": ["#hyderabad", "City Match", "Medical Store", "Chemist Shop", "Distributor"],
+            "review_state": "UNREVIEWED",
+            "status": "New"
+        }
+    ]
+
+    for ld in demo_leads:
+        lead_obj = models.InfluencerLead(**ld)
+        db.add(lead_obj)
+    db.commit()
+    print(f"[Seed] Successfully seeded {len(demo_leads)} target leads for testing!")
 
 if __name__ == "__main__":
     seed_database()

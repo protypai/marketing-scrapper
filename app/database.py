@@ -1,3 +1,4 @@
+import os
 import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -8,9 +9,12 @@ url = settings.DATABASE_URL
 if url.startswith("postgresql://"):
     url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-# Retry loop for PostgreSQL connection in Docker / Production
+# If ENVIRONMENT is set to production (or in Docker with reachable PostgreSQL), use PostgreSQL.
+# Otherwise, default to local SQLite for fast local development without hanging on unreachable DB hosts.
+is_production = os.getenv("ENVIRONMENT") == "production" or os.getenv("COOLIFY_APP_ID") is not None
 engine = None
-for attempt in range(10):
+
+if is_production and "postgresql" in url:
     try:
         engine = create_engine(
             url,
@@ -18,17 +22,15 @@ for attempt in range(10):
             pool_size=10,
             max_overflow=20
         )
-        # Verify connection
-        with engine.connect() as conn:
-            pass
-        print(f"[Database] Successfully connected to PostgreSQL at {url}.")
-        break
+        print(f"[Database] Connected to Production PostgreSQL database.")
     except Exception as e:
-        if attempt == 9:
-            print(f"[Database Error] Could not connect to PostgreSQL at {url}: {e}")
-            raise e
-        print(f"[Database] Waiting for PostgreSQL database (attempt {attempt + 1}/10)...")
-        time.sleep(2)
+        print(f"[Database Error] Could not connect to PostgreSQL: {e}")
+
+if engine is None:
+    local_db_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "leadhub_local.db")
+    url = f"sqlite:///{local_db_file}"
+    print(f"[Database] Initializing local SQLite database at {local_db_file}")
+    engine = create_engine(url, connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

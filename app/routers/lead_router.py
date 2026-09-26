@@ -267,6 +267,38 @@ def rescrape_leads(
         finished_at=job.finished_at
     )
 
+@router.get("/jobs/{job_id}", response_model=schemas.ScrapeJobOut)
+def get_job_status(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    job = db.query(models.ScrapeJob).filter(models.ScrapeJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return schemas.ScrapeJobOut(
+        id=job.id,
+        project_id=job.project_id,
+        city_id=job.city_id,
+        status=job.status,
+        error_message=job.error_message,
+        leads_found=job.leads_found,
+        created_at=job.created_at,
+        finished_at=job.finished_at
+    )
+
+@router.post("/seed-demo")
+def trigger_seed_demo(
+    db: Session = Depends(get_db)
+):
+    from app.seed import seed_demo_target_leads
+    # Force seed sample target leads for testing
+    db.query(models.InfluencerLead).delete()
+    db.commit()
+    seed_demo_target_leads(db)
+    return {"status": "ok", "message": "Demo target leads populated successfully"}
+
 @router.get("/discovery-queries")
 def get_discovery_queries(
     project_id: int,
