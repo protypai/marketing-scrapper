@@ -10,3 +10,6 @@ ENV/
 .gitignore
 .env
 data/leadhub.db
+node_modules/
+frontend/node_modules/
+scratch/
