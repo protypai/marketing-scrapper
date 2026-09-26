@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # PostgreSQL Database Connection
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres_password_2026@postgres:5432/leadhub")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:postgres_password_2026@postgres:5432/leadhub")
 
     # Apify Settings
     APIFY_API_TOKEN: str = os.getenv("APIFY_API_TOKEN", "")
