@@ -53,3 +53,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.marketingscrapper.rule=Host(`marketingscrapper.protypai.online`)"
+      - "traefik.http.routers.marketingscrapper.entrypoints=websecure"
+      - "traefik.http.routers.marketingscrapper.tls=true"
+      - "traefik.http.routers.marketingscrapper.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.marketingscrapper-http.rule=Host(`marketingscrapper.protypai.online`)"
+      - "traefik.http.routers.marketingscrapper-http.entrypoints=web"
+      - "traefik.http.routers.marketingscrapper-http.middlewares=redirect-to-https"
