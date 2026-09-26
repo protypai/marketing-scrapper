@@ -11,7 +11,8 @@ CITY_ALIASES = {
     "Tirupati": ["tirupati"],
     "Karimnagar": ["karimnagar"],
     "Nizamabad": ["nizamabad"],
-    "Kakinada": ["kakinada"]
+    "Kakinada": ["kakinada"],
+    "Proddatur": ["proddatur", "proddaturu", "kadapa", "ysr kadapa", "cbit"]
 }
 
 INDUSTRY_KEYWORDS = {
