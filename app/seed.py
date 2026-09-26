@@ -64,7 +64,8 @@ def seed_database():
             {"name": "Tirupati", "state": "Andhra Pradesh", "keywords": ["Tirupati news", "Tirupati business"]},
             {"name": "Karimnagar", "state": "Telangana", "keywords": ["Karimnagar business"]},
             {"name": "Nizamabad", "state": "Telangana", "keywords": ["Nizamabad business"]},
-            {"name": "Kakinada", "state": "Andhra Pradesh", "keywords": ["Kakinada business"]}
+            {"name": "Kakinada", "state": "Andhra Pradesh", "keywords": ["Kakinada business"]},
+            {"name": "Proddatur", "state": "Andhra Pradesh", "keywords": ["Proddatur business", "Proddatur news", "Proddatur town", "YSR Kadapa"]}
         ]
 
         city_objs = {}
@@ -91,7 +92,8 @@ def seed_database():
                 "Tirupati": ["#petrolpump", "#petrolpumpowner", "#fuelstation", "#tirupatipetrolpump"],
                 "Karimnagar": ["#petrolpump", "#petrolpumpowner", "#fuelstation"],
                 "Nizamabad": ["#petrolpump", "#petrolpumpowner", "#fuelstation"],
-                "Kakinada": ["#petrolpump", "#petrolpumpowner", "#fuelstation"]
+                "Kakinada": ["#petrolpump", "#petrolpumpowner", "#fuelstation"],
+                "Proddatur": ["#proddatur", "#proddaturbunk", "#petrolpump", "#petrolbunk", "#fuelstation"]
             },
             "pharmaflow": {
                 "Rajahmundry": ["#rajahmundry", "#rajamahendravaram", "#pharmacy", "#medicalstore", "#chemist"],
@@ -103,7 +105,8 @@ def seed_database():
                 "Tirupati": ["#medicalstore", "#pharmacist", "#chemist", "#tirupatimedical"],
                 "Karimnagar": ["#medicalstore", "#pharmacist", "#chemist"],
                 "Nizamabad": ["#medicalstore", "#pharmacist", "#chemist"],
-                "Kakinada": ["#medicalstore", "#pharmacist", "#chemist"]
+                "Kakinada": ["#medicalstore", "#pharmacist", "#chemist"],
+                "Proddatur": ["#proddatur", "#proddaturmedical", "#pharmacy", "#medicalstore", "#chemist"]
             }
         }
 
@@ -209,6 +212,25 @@ def seed_demo_target_leads(db: Session):
             "review_state": "UNREVIEWED",
             "status": "New"
         },
+        {
+            "project_id": pumppilot.id if pumppilot else 1,
+            "city_id": cities.get("Proddatur", 11),
+            "username": "proddatur_fuel_station",
+            "full_name": "Proddatur Petrol Bunk & Fuel Dealers",
+            "follower_count": 16200,
+            "following_count": 540,
+            "media_count": 920,
+            "profile_pic_url": "https://images.unsplash.com/photo-1527018601619-a508a2be00cd?w=200",
+            "bio_text": "Proddatur Petrol Bunk Association • Shift Dip Ledger & Shift Automation • Credit Sales Ledger • Contact for Fuel ERP",
+            "public_email": "bunks@proddaturfuel.in",
+            "public_phone": "+91 98492 11223",
+            "whatsapp_link": "https://wa.me/919849211223",
+            "external_url": "https://proddaturfuel.in",
+            "discovery_score": 93,
+            "discovery_signals": ["#proddatur", "City Match", "Fuel Station", "Petrol Bunk"],
+            "review_state": "UNREVIEWED",
+            "status": "New"
+        },
         # PharmaFlow Leads
         {
             "project_id": pharmaflow.id if pharmaflow else 2,
@@ -245,6 +267,25 @@ def seed_demo_target_leads(db: Session):
             "external_url": "https://hyderabadpharma.org",
             "discovery_score": 95,
             "discovery_signals": ["#hyderabad", "City Match", "Medical Store", "Chemist Shop", "Distributor"],
+            "review_state": "UNREVIEWED",
+            "status": "New"
+        },
+        {
+            "project_id": pharmaflow.id if pharmaflow else 2,
+            "city_id": cities.get("Proddatur", 11),
+            "username": "proddatur_medical_hub",
+            "full_name": "Proddatur Retail Chemists & Wholesale Pharma",
+            "follower_count": 21400,
+            "following_count": 780,
+            "media_count": 1340,
+            "profile_pic_url": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=200",
+            "bio_text": "Proddatur Chemists & Druggists Association • GST Billing • Batch Expiry Tracking • Wholesale Pharma Software",
+            "public_email": "pharma@proddaturmedical.in",
+            "public_phone": "+91 94405 55667",
+            "whatsapp_link": "https://wa.me/919440555667",
+            "external_url": "https://proddaturmedical.in",
+            "discovery_score": 95,
+            "discovery_signals": ["#proddatur", "City Match", "Medical Store", "Chemist Shop", "GST Billing"],
             "review_state": "UNREVIEWED",
             "status": "New"
         }
